@@ -1,0 +1,21 @@
+# Web Framework & Server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# HTTP Client (for downloading audio)
+requests==2.31.0
+
+# Audio Processing (The heavy lifters)
+librosa==0.10.1
+soundfile==0.12.1
+numpy==1.26.3
+scipy==1.11.4
+
+# Machine Learning (Lightweight)
+scikit-learn==1.4.0
+joblib==1.3.2
+
+# Utilities
+python-multipart==0.0.6  # Handling potential form data edge cases
