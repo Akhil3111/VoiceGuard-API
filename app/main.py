@@ -1,5 +1,5 @@
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from app.api.endpoints import router as api_router
 
 # Setup Logging
@@ -19,12 +19,28 @@ app = FastAPI(
 # Include API Router
 app.include_router(api_router, prefix="/api/v1", tags=["Analysis"])
 
+
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Simple health check for load balancers."""
     return {"status": "healthy", "service": "VoiceGuard-API"}
+
+
+# 🔥 ADD THIS: Root POST fallback (for GUVI tester)
+@app.post("/")
+async def root_post_fallback(request: Request):
+    return {
+        "message": "VoiceGuard API is live. Use POST /api/v1/analyze"
+    }
+
+
+# 🔥 ADD THIS: API prefix POST fallback
+@app.post("/api/v1")
+async def api_root_post_fallback(request: Request):
+    return {
+        "message": "Invalid endpoint. Use POST /api/v1/analyze"
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
-    # In production, this is run via: uvicorn app.main:app --host 0.0.0.0 --port 80
     uvicorn.run(app, host="0.0.0.0", port=8000)
