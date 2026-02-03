@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
+
 class VoiceRequest(BaseModel):
     language: str = Field(..., description="Language of the audio")
     audio_format: str = Field(..., description="mp3 | wav")
