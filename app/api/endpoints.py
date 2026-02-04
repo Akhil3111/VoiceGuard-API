@@ -12,23 +12,22 @@ logger = logging.getLogger(__name__)
 @router.post(
     "/analyze", 
     response_model=VoiceResponse, 
-    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Detect AI-Generated Voice"
 )
 async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(verify_api_key)):
     try:
-        # 1. Capture ALL data sent by the tester
+        # 1. Capture payload for debugging
         incoming_data = request.model_dump()
-        logger.info(f"FULL PAYLOAD KEYS: {list(incoming_data.keys())}") # This will reveal the secret key name
+        logger.info(f"FULL PAYLOAD KEYS: {list(incoming_data.keys())}")
 
         y, sr = None, None
         
-        # 2. Smart Field Detection (Find the audio key automatically)
-        # We look for 'audio_base64', OR 'audio_data', OR 'file', OR 'base64', etc.
+        # 2. Smart Field Detection
         base64_candidate = (
             incoming_data.get("audio_base64") or 
-            incoming_data.get("audioBase64") or   # Common camelCase variation
-            incoming_data.get("audio_data") or    # Common variation
+            incoming_data.get("audioBase64") or 
+            incoming_data.get("audio_data") or
             incoming_data.get("file") or
             incoming_data.get("data")
         )
@@ -36,7 +35,6 @@ async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(v
         # 3. Logic Branch
         if base64_candidate:
             logger.info("Found Base64 audio data!")
-            # Use the format if provided, otherwise default to mp3/wav
             fmt = incoming_data.get("audio_format", "wav")
             y, sr = load_audio_from_base64(base64_candidate, fmt)
             
@@ -45,7 +43,6 @@ async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(v
             y, sr = download_and_load_audio(str(request.audio_url))
             
         else:
-            # If we still fail, the log above will tell us the exact keys available
             msg = f"No audio found. Available keys: {list(incoming_data.keys())}"
             logger.warning(msg)
             raise HTTPException(status_code=400, detail=msg)
@@ -62,8 +59,19 @@ async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(v
             explanation=result["explanation"]
         )
 
+    # --- RESTORED ERROR HANDLERS ---
+    except AudioProcessingError as e:
+        # Validates bad audio (empty, corrupted) as 400 Bad Request
+        logger.warning(f"Client Bad Audio: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    except FeatureExtractionError as e:
+        logger.error(f"Analysis Failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Could not extract features.")
+
     except HTTPException as e:
         raise e
+
     except Exception as e:
-        logger.error(f"Error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal analysis error")
+        logger.error(f"System Crash: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal analysis error")
