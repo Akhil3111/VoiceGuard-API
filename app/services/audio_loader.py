@@ -6,29 +6,28 @@ import librosa
 import numpy as np
 import base64
 import binascii
+import gc  # MODIFIED: Added for memory management
 
 logger = logging.getLogger(__name__)
 
-# --- OPTIMIZED SETTINGS ---
-# Reduced to 10s and 8kHz to prevent "Request Timed Out" on free cloud servers
+# MODIFIED: Optimized constants for CPU-only / Free-Tier environments
 MAX_AUDIO_DURATION_SEC = 10 
 TARGET_SAMPLE_RATE = 8000   
 DOWNLOAD_TIMEOUT_SEC = 5
-MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # Limit to 5MB
+MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB Limit
 
 class AudioProcessingError(Exception):
     pass
 
 def _process_file(filepath: str) -> tuple[np.ndarray, int]:
-    """Internal helper to load and sanitize audio from a local file."""
+    """Internal helper to load and sanitize audio."""
     try:
-        # Optimization: Check file size first
-        file_size = os.path.getsize(filepath)
-        if file_size > MAX_FILE_SIZE_BYTES:
-            raise AudioProcessingError(f"File too large ({file_size/1024/1024:.1f}MB). Limit is 5MB.")
+        # Check size first to fail fast
+        if os.path.getsize(filepath) > MAX_FILE_SIZE_BYTES:
+            raise AudioProcessingError("File too large (>5MB).")
 
-        # Load with fixed Sample Rate (8kHz) and Mono
-        # Removed 'res_type' to fix missing dependency error
+        # MODIFIED: Load with 8kHz limit and 10s cap. 
+        # Removed 'res_type' to fix missing dependency error.
         y, sr = librosa.load(
             filepath, 
             sr=TARGET_SAMPLE_RATE, 
@@ -50,6 +49,9 @@ def _process_file(filepath: str) -> tuple[np.ndarray, int]:
     except Exception as e:
         logger.warning(f"Audio Load Error: {e}")
         raise AudioProcessingError(f"Corrupted or unsupported audio: {str(e)}")
+    finally:
+        # MODIFIED: Force garbage collection to free RAM immediately
+        gc.collect()
 
 def download_and_load_audio(url: str) -> tuple[np.ndarray, int]:
     """Downloads audio from a URL and loads it."""
@@ -59,7 +61,6 @@ def download_and_load_audio(url: str) -> tuple[np.ndarray, int]:
         with requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT_SEC) as response:
             response.raise_for_status()
             
-            # Streaming download to avoid memory spikes
             with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as tmp_file:
                 temp_path = tmp_file.name
                 downloaded = 0
@@ -85,6 +86,7 @@ def load_audio_from_base64(b64_string: str, file_format: str = "wav") -> tuple[n
     try:
         logger.info("Processing Base64 audio input")
         
+        # Handle Data URI scheme if present
         if "," in b64_string:
             b64_string = b64_string.split(",")[1]
             
@@ -93,7 +95,6 @@ def load_audio_from_base64(b64_string: str, file_format: str = "wav") -> tuple[n
         except binascii.Error:
             raise AudioProcessingError("Invalid Base64 string provided.")
 
-        # Safety: Don't write huge files to disk
         if len(file_data) > MAX_FILE_SIZE_BYTES:
              raise AudioProcessingError("Base64 audio too large (>5MB).")
 

@@ -1,8 +1,8 @@
-from pydantic import BaseModel, HttpUrl, Field, validator, ConfigDict # Import ConfigDict
-from typing import Optional, Any, Dict
+from pydantic import BaseModel, HttpUrl, Field, validator, ConfigDict
+from typing import Optional, Any
 
 class VoiceRequest(BaseModel):
-    # Allow unknown keys so we can see what the tester is sending
+    # MODIFIED: Allow extra fields so we don't crash on unexpected keys like 'audioBase64Format'
     model_config = ConfigDict(extra='allow') 
 
     audio_url: Optional[HttpUrl] = Field(None)
@@ -13,7 +13,7 @@ class VoiceRequest(BaseModel):
 
     @validator('audio_base64', check_fields=False)
     def check_input_method(cls, v, values):
-        # We relax this validation since the key might be named differently
+        # MODIFIED: Relaxed validation to allow "hunting" for the key in endpoints.py
         return v
 
 class VoiceResponse(BaseModel):

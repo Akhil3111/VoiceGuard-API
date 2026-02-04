@@ -12,18 +12,19 @@ logger = logging.getLogger(__name__)
 @router.post(
     "/analyze", 
     response_model=VoiceResponse, 
+    # MODIFIED: Explicitly document error states for Swagger UI
     responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Detect AI-Generated Voice"
 )
 async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(verify_api_key)):
     try:
-        # 1. Capture payload for debugging
+        # MODIFIED: Log incoming keys to debug what the tester is actually sending
         incoming_data = request.model_dump()
         logger.info(f"FULL PAYLOAD KEYS: {list(incoming_data.keys())}")
 
         y, sr = None, None
         
-        # 2. Smart Field Detection
+        # MODIFIED: Smart Field Detection (Catch-all for various naming conventions)
         base64_candidate = (
             incoming_data.get("audio_base64") or 
             incoming_data.get("audioBase64") or 
@@ -32,7 +33,7 @@ async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(v
             incoming_data.get("data")
         )
 
-        # 3. Logic Branch
+        # Logic Branch
         if base64_candidate:
             logger.info("Found Base64 audio data!")
             fmt = incoming_data.get("audio_format", "wav")
@@ -47,7 +48,7 @@ async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(v
             logger.warning(msg)
             raise HTTPException(status_code=400, detail=msg)
 
-        # 4. Pipeline
+        # Pipeline
         features = extract_features(y, sr)
         result = IntelligenceEngine.analyze_voice(features)
 
@@ -59,9 +60,8 @@ async def analyze_audio_endpoint(request: VoiceRequest, api_key: str = Depends(v
             explanation=result["explanation"]
         )
 
-    # --- RESTORED ERROR HANDLERS ---
+    # MODIFIED: Explicit Error Handlers to prevent 500 Crashes
     except AudioProcessingError as e:
-        # Validates bad audio (empty, corrupted) as 400 Bad Request
         logger.warning(f"Client Bad Audio: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
