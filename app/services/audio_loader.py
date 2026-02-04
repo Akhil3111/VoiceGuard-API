@@ -28,13 +28,12 @@ def _process_file(filepath: str) -> tuple[np.ndarray, int]:
             raise AudioProcessingError(f"File too large ({file_size/1024/1024:.1f}MB). Limit is 5MB.")
 
         # Load with fixed Sample Rate (8kHz) and Mono
-        # res_type='kaiser_fast' speeds up loading significantly
+        # Removed 'res_type' to fix missing dependency error
         y, sr = librosa.load(
             filepath, 
             sr=TARGET_SAMPLE_RATE, 
             mono=True, 
-            duration=MAX_AUDIO_DURATION_SEC, # HARD CAP: Only load first 10s
-            res_type='kaiser_fast' 
+            duration=MAX_AUDIO_DURATION_SEC 
         )
         
         if len(y) == 0:
