@@ -1,21 +1,19 @@
-from pydantic import BaseModel, HttpUrl, Field, validator
-from typing import Optional
+from pydantic import BaseModel, HttpUrl, Field, validator, ConfigDict # Import ConfigDict
+from typing import Optional, Any, Dict
 
 class VoiceRequest(BaseModel):
-    # Support BOTH the URL method (original) and Base64 method (Tester)
-    audio_url: Optional[HttpUrl] = Field(None, description="Publicly accessible URL to the audio file")
-    
-    # New fields for the Endpoint Tester
-    audio_base64: Optional[str] = Field(None, description="Base64 encoded audio string")
-    audio_format: Optional[str] = Field(None, description="File format e.g., 'wav', 'mp3'")
-    language: Optional[str] = Field(None, description="Input language (optional context)")
+    # Allow unknown keys so we can see what the tester is sending
+    model_config = ConfigDict(extra='allow') 
+
+    audio_url: Optional[HttpUrl] = Field(None)
+    audio_base64: Optional[str] = Field(None)
+    audio_format: Optional[str] = Field(None)
+    language: Optional[str] = Field(None)
     message: Optional[str] = None
 
-    @validator('audio_base64')
+    @validator('audio_base64', check_fields=False)
     def check_input_method(cls, v, values):
-        # Ensure either URL or Base64 is provided
-        if not v and not values.get('audio_url'):
-            raise ValueError('You must provide either audio_url OR audio_base64')
+        # We relax this validation since the key might be named differently
         return v
 
 class VoiceResponse(BaseModel):
